@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 
-from .state import State
+from .state import State, GraphContext
 from .tools import TOOLS
 from .db import checkpointer
 from .nodes import (
@@ -16,7 +16,7 @@ from .nodes import (
 
 
 def build_app():
-    graph = StateGraph(State)
+    graph = StateGraph(State, context_schema=GraphContext)
 
     graph.add_node("intent", intent)
     graph.add_node("reject", reject)

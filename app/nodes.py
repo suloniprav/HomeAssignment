@@ -6,11 +6,12 @@ from langchain_core.messages import (
 )
 from langchain_core.messages.utils import count_tokens_approximately
 from langgraph.graph import END
+from langgraph.runtime import Runtime
 
 from .config import HISTORY_TOKEN_BUDGET, MAX_RETRIES
 from .models import intent_llm, evaluator_llm, agent_llm
 from .prompts import SYSTEM_PROMPT, INTENT_PROMPT, EVALUATOR_PROMPT, REJECT_MESSAGE
-from .state import State
+from .state import State, GraphContext
 
 
 def _latest_human(messages) -> str:
@@ -20,7 +21,7 @@ def _latest_human(messages) -> str:
     return ""
 
 
-def intent(state: State) -> dict:
+def intent(state: State, runtime: Runtime[GraphContext]) -> dict:
     question = _latest_human(state["messages"])
     result = intent_llm.invoke(
         [SystemMessage(content=INTENT_PROMPT), HumanMessage(content=question)]
@@ -28,11 +29,11 @@ def intent(state: State) -> dict:
     return {"intent": result.category, "retry_count": 0, "eval_passed": False}
 
 
-def reject(state: State) -> dict:
+def reject(state: State, runtime: Runtime[GraphContext]) -> dict:
     return {"messages": [AIMessage(content=REJECT_MESSAGE)], "last_response": REJECT_MESSAGE}
 
 
-def agent(state: State) -> dict:
+def agent(state: State, runtime: Runtime[GraphContext]) -> dict:
     history = trim_messages(
         state["messages"],
         max_tokens=HISTORY_TOKEN_BUDGET,
@@ -41,12 +42,14 @@ def agent(state: State) -> dict:
         start_on="human",
         allow_partial=False,
     )
-    conversation = [SystemMessage(content=SYSTEM_PROMPT)] + history
+    username = runtime.context["username"]
+    system_prompt = f"{SYSTEM_PROMPT}\n\nYou are currently tutoring {username}."
+    conversation = [SystemMessage(content=system_prompt)] + history
     response = agent_llm.invoke(conversation)
     return {"messages": [response], "last_response": response.content}
 
 
-def evaluator(state: State) -> dict:
+def evaluator(state: State, runtime: Runtime[GraphContext]) -> dict:
     question = _latest_human(state["messages"])
     answer = state["last_response"]
     result = evaluator_llm.invoke(

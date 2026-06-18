@@ -10,3 +10,8 @@ class State(TypedDict):
     intent: str
     retry_count: int
     eval_passed: bool
+
+
+class GraphContext(TypedDict):
+    user_id: str
+    username: str
